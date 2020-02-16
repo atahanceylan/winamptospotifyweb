@@ -42,4 +42,4 @@ _ReSharper*/
 
 # Office Temp Files
 ~$*
-appsettings.config
+secrets.json
