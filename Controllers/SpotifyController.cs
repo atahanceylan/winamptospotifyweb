@@ -35,7 +35,7 @@ namespace dotnet_core_spotify_authentication.Controllers
 
         public SpotifyController(IOptions<SpotifyAPIDetails> spotifyAPIDetails)
         {
-            // We want to know if twilioAccountDetails is null so we throw an exception if it is           
+            // We want to know if spotifyAPIDetails is null so we throw an exception if it is           
             _SpotifyAPIDetails = spotifyAPIDetails.Value ?? throw new ArgumentException(nameof(spotifyAPIDetails));
         }
 
@@ -143,6 +143,7 @@ namespace dotnet_core_spotify_authentication.Controllers
 
             string albumName = foldername.Split('\\')[foldername.Split('\\').Length - 1];
             string playlistId = await CreatePlayList(albumName);
+            Console.WriteLine($"{foldername} will be processed...");
             TrackInfo trackInfo = await GetTrackUriAndNames(foldername);
             bool isTracksAdded = await AddTrackToPlaylistFunc(playlistId, trackInfo.TrackUri);
             var sbTracksAdded = new StringBuilder();
@@ -173,7 +174,7 @@ namespace dotnet_core_spotify_authentication.Controllers
             TrackInfo albumRelatedTrackInfos = new TrackInfo();
             StringBuilder trackNameStrBuilder = new StringBuilder();
             StringBuilder trackUriBuilder = new StringBuilder();
-
+            
             if (trackInfoDict.Count > 0)
             {
                 foreach (KeyValuePair<string, string> kv in trackInfoDict)
@@ -259,16 +260,19 @@ namespace dotnet_core_spotify_authentication.Controllers
             if (string.IsNullOrWhiteSpace(filepath)) throw new ArgumentException("Filepath is empty");        
             Dictionary<string, string> trackInfoDict = new Dictionary<string, string>();
             string path = filepath;
-
+            bool isArtistNameExistInFolderPath = false;
             string artist = filepath.Split('\\')[filepath.Split('\\').Length - 1].Split(' ')[0];
-            List<string> fileNamesList = GetMp3FileNames(path, artist);
+            List<string> fileNamesList = GetMp3FileNames(path, artist, ref isArtistNameExistInFolderPath);
 
             if (fileNamesList.Count > 0)
             {
                 foreach (var item in fileNamesList)
                 {
                     var qb = new QueryBuilder();
-                    qb.Add("q", item);  /*$"artist:{artist}"*/
+                    var queryTrackString = item;
+                    if (isArtistNameExistInFolderPath)
+                        queryTrackString += $" artist:{artist}";
+                    qb.Add("q", queryTrackString);
                     qb.Add("type", "track");
                     qb.Add("limit", "1");
 
@@ -284,7 +288,7 @@ namespace dotnet_core_spotify_authentication.Controllers
                             var tracks = results.tracks;
                             if (tracks.items.Count > 0)
                             {
-                                trackInfoDict.Add(tracks.items[0].uri, tracks.items[0].name);
+                                trackInfoDict.TryAdd(tracks.items[0].uri, tracks.items[0].name);
                                 Console.WriteLine($"Track {tracks.items[0].name} found.");
                             }
                         }
@@ -303,12 +307,12 @@ namespace dotnet_core_spotify_authentication.Controllers
             }
         }
 
-        private List<string> GetMp3FileNames(string path, string artist)
+        private List<string> GetMp3FileNames(string path, string artist,ref bool isArtistNameExistInFolderPath)
         {
             if (string.IsNullOrWhiteSpace(path)) throw new ArgumentException("Filepath is empty");
             if (artist == null) throw new ArgumentException("Artist is null");
 
-            FileInfo[] filesInfoArray = new DirectoryInfo(path).GetFiles();
+            FileInfo[] filesInfoArray = new DirectoryInfo(path).GetFiles("*.mp3");
             List<string> fileNames = new List<string>();
 
             if (filesInfoArray.Length > 0)
@@ -316,7 +320,8 @@ namespace dotnet_core_spotify_authentication.Controllers
                 foreach (var file in filesInfoArray)
                 {
                     var fileName = Path.GetFileNameWithoutExtension(file.Name);
-
+                    if (!isArtistNameExistInFolderPath)
+                        isArtistNameExistInFolderPath = fileName.ToLower().Contains(artist.ToLower());
                     Regex reg = new Regex(@"[^\p{L}\p{N} ]");
                     fileName = reg.Replace(fileName, String.Empty);
                     fileName = Regex.Replace(fileName, @"[0-9]+", "");
