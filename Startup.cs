@@ -10,7 +10,7 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using winamptospotifyweb.Models;
 
-namespace dotnetcorespotifyauthentication
+namespace winamptospotifyweb
 {
     public class Startup
     {
